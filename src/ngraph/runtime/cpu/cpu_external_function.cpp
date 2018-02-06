@@ -270,9 +270,12 @@ void runtime::cpu::CPU_ExternalFunction::compile()
 
 using namespace ngraph::runtime::cpu::eigen;
 using namespace ngraph::runtime;
+using namespace mkldnn;
 
 )";
     string pch_header_source = writer.get_code();
+
+    writer << "auto cpu_engine = engine(engine::cpu, 0);\n";
 
     // The "dso_handle" symbol is required by __cxa_atexit()
     // which is enabled because the JIT uses it as the default mechanism
