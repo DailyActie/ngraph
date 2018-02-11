@@ -200,40 +200,6 @@ namespace ngraph
         return result;
     }
 
-    template <class InputIt, class BinaryOp>
-    typename std::iterator_traits<InputIt>::value_type
-        reduce(InputIt first, InputIt last, BinaryOp op)
-    {
-        typename std::iterator_traits<InputIt>::value_type result;
-
-        if (first == last)
-        {
-            result = {};
-        }
-        else
-        {
-            result = *first++;
-            while (first != last)
-            {
-                result = op(result, *first);
-                first++;
-            }
-        }
-        return result;
-    }
-
-    template <typename T>
-    T plus(const T& a, const T& b)
-    {
-        return a + b;
-    }
-
-    template <typename T>
-    T mul(const T& a, const T& b)
-    {
-        return a * b;
-    }
-
     template <typename T>
     T ceil_div(const T& x, const T& y)
     {

@@ -97,9 +97,10 @@ codegen::Compiler::~Compiler()
 {
 }
 
-void codegen::Compiler::set_precompiled_header_source(const std::string& source)
+void codegen::Compiler::set_precompiled_header_source(const std::string& source,
+                                                      const string& pch_name)
 {
-    s_static_compiler.set_precompiled_header_source(source);
+    s_static_compiler.set_precompiled_header_source(source, pch_name);
 }
 
 void codegen::Compiler::add_header_search_path(const std::string& path)
@@ -280,7 +281,7 @@ std::unique_ptr<codegen::Module>
     {
         // Preprocessor options
         preprocessor_options.ImplicitPCHInclude = m_pch_path;
-        preprocessor_options.DisablePCHValidation = 0;
+        preprocessor_options.DisablePCHValidation = 1;
     }
 
     // Map code filename to a memoryBuffer
@@ -325,6 +326,8 @@ std::unique_ptr<codegen::Module>
 
 void codegen::StaticCompiler::generate_pch(const string& source)
 {
+    // initialize();
+    m_precompiled_header_valid = false;
     PreprocessorOptions& preprocessor_options = m_compiler->getInvocation().getPreprocessorOpts();
     m_pch_path = file_util::tmp_filename();
     m_compiler->getFrontendOpts().OutputFile = m_pch_path;
@@ -425,7 +428,13 @@ void codegen::StaticCompiler::load_headers_from_resource()
     }
 }
 
-void codegen::StaticCompiler::set_precompiled_header_source(const std::string& source)
+void codegen::StaticCompiler::set_precompiled_header_source(const std::string& source,
+                                                            const string& pch_name)
 {
-    m_precomiled_header_source = source;
+    if (pch_name != m_pch_name)
+    {
+        m_pch_name = pch_name;
+        m_precompiled_header_valid = false;
+        m_precomiled_header_source = source;
+    }
 }

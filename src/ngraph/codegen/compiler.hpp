@@ -60,7 +60,7 @@ class ngraph::codegen::Compiler
 public:
     Compiler();
     ~Compiler();
-    void set_precompiled_header_source(const std::string& source);
+    void set_precompiled_header_source(const std::string& source, const std::string& pch_name = "");
     void add_header_search_path(const std::string& path);
     std::unique_ptr<ngraph::codegen::Module> compile(const std::string& source);
     std::unique_ptr<clang::CodeGenAction>& get_compiler_action() { return m_compiler_action; }
@@ -76,7 +76,7 @@ public:
 
     void set_debuginfo_enabled(bool state) { m_debuginfo_enabled = state; }
     bool is_debuginfo_enabled() { return m_debuginfo_enabled; }
-    void set_precompiled_header_source(const std::string& source);
+    void set_precompiled_header_source(const std::string& source, const std::string& pch_name);
     void add_header_search_path(const std::string& path);
 
     std::unique_ptr<ngraph::codegen::Module>
@@ -93,6 +93,7 @@ private:
     std::vector<std::string> m_extra_search_path_list;
     std::string m_pch_path;
     std::string m_precomiled_header_source;
+    std::string m_pch_name;
 
     bool is_version_number(const std::string& path);
     void configure_search_path();

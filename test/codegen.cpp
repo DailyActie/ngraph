@@ -27,13 +27,15 @@
 using namespace std;
 using namespace ngraph;
 
-void compile(const string& source)
+void run_tests()
 {
-}
+    // If we are using PCH them compile them before benchmark
+    {
+        codegen::Compiler compiler;
+        auto module = compiler.compile("");
+        ASSERT_NE(nullptr, module);
+    }
 
-TEST(benchmark, compile_time)
-{
-    cout << "All times in milliseconds\n";
     stopwatch timer;
     size_t compile_count = 10;
     {
@@ -46,10 +48,9 @@ TEST(benchmark, compile_time)
             ASSERT_NE(nullptr, module);
         }
         timer.stop();
-        cout << "empty source\n";
         cout << setw(10) << fixed << showpoint << setprecision(1)
              << static_cast<double>(timer.get_milliseconds()) / static_cast<double>(compile_count)
-             << "\n";
+             << "  empty source\n";
     }
 
     vector<string> includes = {
@@ -78,7 +79,6 @@ TEST(benchmark, compile_time)
         R"(#include "ngraph/runtime/kernel/sum.hpp")",
         R"(#include "ngraph/util.hpp")"};
 
-    cout << "\nno precompiled headers\n";
     for (const string& include : includes)
     {
         string source = include;
@@ -93,6 +93,114 @@ TEST(benchmark, compile_time)
         cout << setw(10) << fixed << showpoint << setprecision(1)
              << static_cast<double>(timer.get_milliseconds()) / static_cast<double>(compile_count);
         cout << "  " << source << "\n";
+    }
+
+    {
+        string source =
+            R"(#include <cmath>,
+#include <Eigen/Dense>,
+#include <tbb/flow_graph.h>,
+#include "ngraph/runtime/aligned_buffer.hpp",
+#include "ngraph/runtime/cpu/cpu_eigen_utils.hpp",
+#include "ngraph/runtime/cpu/cpu_kernels.hpp",
+#include "ngraph/runtime/kernel/avg_pool.hpp",
+#include "ngraph/runtime/kernel/broadcast.hpp",
+#include "ngraph/runtime/kernel/concat.hpp",
+#include "ngraph/runtime/kernel/convolution.hpp",
+#include "ngraph/runtime/kernel/dot.hpp",
+#include "ngraph/runtime/kernel/max_pool.hpp",
+#include "ngraph/runtime/kernel/not.hpp",
+#include "ngraph/runtime/kernel/one_hot.hpp",
+#include "ngraph/runtime/kernel/pad.hpp",
+#include "ngraph/runtime/kernel/reduce.hpp",
+#include "ngraph/runtime/kernel/reduce_window.hpp",
+#include "ngraph/runtime/kernel/replace_slice.hpp",
+#include "ngraph/runtime/kernel/reshape.hpp",
+#include "ngraph/runtime/kernel/reverse.hpp",
+#include "ngraph/runtime/kernel/select_and_scatter.hpp",
+#include "ngraph/runtime/kernel/slice.hpp",
+#include "ngraph/runtime/kernel/sum.hpp",
+#include "ngraph/util.hpp")";
+        timer.start();
+        for (size_t i = 0; i < compile_count; i++)
+        {
+            codegen::Compiler compiler;
+            auto module = compiler.compile(source);
+            ASSERT_NE(nullptr, module);
+        }
+        timer.stop();
+        cout << setw(10) << fixed << showpoint << setprecision(1)
+             << static_cast<double>(timer.get_milliseconds()) / static_cast<double>(compile_count);
+        cout << "  all headers\n";
+    }
+}
+
+TEST(benchmark, compile_time)
+{
+    cout << "All times in milliseconds\n";
+
+    cout << "\nno precompiled headers\n";
+    run_tests();
+
+    {
+        cout << "\nprecompiled headers with neither eigen nor tbb\n";
+        string pch_source =
+            R"(#include <cmath>,
+#include "ngraph/runtime/aligned_buffer.hpp",
+#include "ngraph/runtime/cpu/cpu_kernels.hpp",
+#include "ngraph/runtime/kernel/avg_pool.hpp",
+#include "ngraph/runtime/kernel/broadcast.hpp",
+#include "ngraph/runtime/kernel/concat.hpp",
+#include "ngraph/runtime/kernel/convolution.hpp",
+#include "ngraph/runtime/kernel/dot.hpp",
+#include "ngraph/runtime/kernel/max_pool.hpp",
+#include "ngraph/runtime/kernel/not.hpp",
+#include "ngraph/runtime/kernel/one_hot.hpp",
+#include "ngraph/runtime/kernel/pad.hpp",
+#include "ngraph/runtime/kernel/reduce.hpp",
+#include "ngraph/runtime/kernel/reduce_window.hpp",
+#include "ngraph/runtime/kernel/replace_slice.hpp",
+#include "ngraph/runtime/kernel/reshape.hpp",
+#include "ngraph/runtime/kernel/reverse.hpp",
+#include "ngraph/runtime/kernel/select_and_scatter.hpp",
+#include "ngraph/runtime/kernel/slice.hpp",
+#include "ngraph/runtime/kernel/sum.hpp",
+#include "ngraph/util.hpp")";
+        codegen::Compiler compiler;
+        compiler.set_precompiled_header_source(pch_source, "no_eigen");
+        run_tests();
+    }
+
+    {
+        cout << "\nprecompiled headers with eigen and tbb\n";
+        string pch_source =
+            R"(#include <cmath>,
+#include <Eigen/Dense>,
+#include <tbb/flow_graph.h>,
+#include "ngraph/runtime/aligned_buffer.hpp",
+#include "ngraph/runtime/cpu/cpu_eigen_utils.hpp",
+#include "ngraph/runtime/cpu/cpu_kernels.hpp",
+#include "ngraph/runtime/kernel/avg_pool.hpp",
+#include "ngraph/runtime/kernel/broadcast.hpp",
+#include "ngraph/runtime/kernel/concat.hpp",
+#include "ngraph/runtime/kernel/convolution.hpp",
+#include "ngraph/runtime/kernel/dot.hpp",
+#include "ngraph/runtime/kernel/max_pool.hpp",
+#include "ngraph/runtime/kernel/not.hpp",
+#include "ngraph/runtime/kernel/one_hot.hpp",
+#include "ngraph/runtime/kernel/pad.hpp",
+#include "ngraph/runtime/kernel/reduce.hpp",
+#include "ngraph/runtime/kernel/reduce_window.hpp",
+#include "ngraph/runtime/kernel/replace_slice.hpp",
+#include "ngraph/runtime/kernel/reshape.hpp",
+#include "ngraph/runtime/kernel/reverse.hpp",
+#include "ngraph/runtime/kernel/select_and_scatter.hpp",
+#include "ngraph/runtime/kernel/slice.hpp",
+#include "ngraph/runtime/kernel/sum.hpp",
+#include "ngraph/util.hpp")";
+        codegen::Compiler compiler;
+        compiler.set_precompiled_header_source(pch_source, "eigen");
+        run_tests();
     }
 }
 
