@@ -16,18 +16,12 @@
 
 #pragma once
 
-#include <algorithm>
 #include <chrono>
-#include <deque>
-#include <functional>
 #include <iostream>
-#include <list>
 #include <map>
 #include <memory>
 #include <sstream>
 #include <string>
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 namespace ngraph

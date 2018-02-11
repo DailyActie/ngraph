@@ -14,6 +14,7 @@
 * limitations under the License.
 *******************************************************************************/
 
+#include <algorithm>
 #include <sstream>
 
 #include "ngraph/builder/numpy_transpose.hpp"
