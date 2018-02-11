@@ -22,9 +22,79 @@
 
 #include "ngraph/codegen/compiler.hpp"
 #include "ngraph/codegen/execution_engine.hpp"
+#include "ngraph/util.hpp"
 
 using namespace std;
 using namespace ngraph;
+
+void compile(const string& source)
+{
+}
+
+TEST(benchmark, compile_time)
+{
+    cout << "All times in milliseconds\n";
+    stopwatch timer;
+    size_t compile_count = 10;
+    {
+        string source = R"()";
+        timer.start();
+        for (size_t i = 0; i < compile_count; i++)
+        {
+            codegen::Compiler compiler;
+            auto module = compiler.compile(source);
+            ASSERT_NE(nullptr, module);
+        }
+        timer.stop();
+        cout << "empty source\n";
+        cout << setw(10) << fixed << showpoint << setprecision(1)
+             << static_cast<double>(timer.get_milliseconds()) / static_cast<double>(compile_count)
+             << "\n";
+    }
+
+    vector<string> includes = {
+        R"(#include <cmath>)",
+        R"(#include <Eigen/Dense>)",
+        R"(#include <tbb/flow_graph.h>)",
+        R"(#include "ngraph/runtime/aligned_buffer.hpp")",
+        R"(#include "ngraph/runtime/cpu/cpu_eigen_utils.hpp")",
+        R"(#include "ngraph/runtime/cpu/cpu_kernels.hpp")",
+        R"(#include "ngraph/runtime/kernel/avg_pool.hpp")",
+        R"(#include "ngraph/runtime/kernel/broadcast.hpp")",
+        R"(#include "ngraph/runtime/kernel/concat.hpp")",
+        R"(#include "ngraph/runtime/kernel/convolution.hpp")",
+        R"(#include "ngraph/runtime/kernel/dot.hpp")",
+        R"(#include "ngraph/runtime/kernel/max_pool.hpp")",
+        R"(#include "ngraph/runtime/kernel/not.hpp")",
+        R"(#include "ngraph/runtime/kernel/one_hot.hpp")",
+        R"(#include "ngraph/runtime/kernel/pad.hpp")",
+        R"(#include "ngraph/runtime/kernel/reduce.hpp")",
+        R"(#include "ngraph/runtime/kernel/reduce_window.hpp")",
+        R"(#include "ngraph/runtime/kernel/replace_slice.hpp")",
+        R"(#include "ngraph/runtime/kernel/reshape.hpp")",
+        R"(#include "ngraph/runtime/kernel/reverse.hpp")",
+        R"(#include "ngraph/runtime/kernel/select_and_scatter.hpp")",
+        R"(#include "ngraph/runtime/kernel/slice.hpp")",
+        R"(#include "ngraph/runtime/kernel/sum.hpp")",
+        R"(#include "ngraph/util.hpp")"};
+
+    cout << "\nno precompiled headers\n";
+    for (const string& include : includes)
+    {
+        string source = include;
+        timer.start();
+        for (size_t i = 0; i < compile_count; i++)
+        {
+            codegen::Compiler compiler;
+            auto module = compiler.compile(source);
+            ASSERT_NE(nullptr, module);
+        }
+        timer.stop();
+        cout << setw(10) << fixed << showpoint << setprecision(1)
+             << static_cast<double>(timer.get_milliseconds()) / static_cast<double>(compile_count);
+        cout << "  " << source << "\n";
+    }
+}
 
 TEST(DISABLED_codegen, simple_return)
 {

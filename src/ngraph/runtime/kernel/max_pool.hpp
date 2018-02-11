@@ -16,8 +16,8 @@
 
 #pragma once
 
-#include <algorithm>
 #include <cmath>
+#include <limits>
 #include <numeric>
 
 #include "ngraph/common.hpp"

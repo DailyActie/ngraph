@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <cstddef>
+
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wfloat-equal"
 
