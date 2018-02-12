@@ -1,16 +1,18 @@
-// ----------------------------------------------------------------------------
-// Copyright 2017 Nervana Systems Inc.
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// ----------------------------------------------------------------------------
+/*******************************************************************************
+* Copyright 2017-2018 Intel Corporation
+*
+* Licensed under the Apache License, Version 2.0 (the "License");
+* you may not use this file except in compliance with the License.
+* You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*******************************************************************************/
 
 #include <algorithm>
 #include <cinttypes>
@@ -26,10 +28,20 @@
 #include "util/all_close.hpp"
 #include "util/ndarray.hpp"
 #include "util/test_tools.hpp"
-#include "ngraph/runtime/cpu/cpu_backend.hpp"
 
 using namespace std;
 using namespace ngraph;
+
+static const vector<element::Type> s_known_element_types = {element::from<float>(),
+                                                            element::from<double>(),
+                                                            element::from<int8_t>(),
+                                                            element::from<int16_t>(),
+                                                            element::from<int32_t>(),
+                                                            element::from<int64_t>(),
+                                                            element::from<uint8_t>(),
+                                                            element::from<uint16_t>(),
+                                                            element::from<uint32_t>(),
+                                                            element::from<uint64_t>()};
 
 TEST(${BACKEND_NAME}, aliased_output)
 {
@@ -37,7 +49,8 @@ TEST(${BACKEND_NAME}, aliased_output)
     auto A = make_shared<op::Parameter>(element::f32, shape);
     auto B = make_shared<op::Parameter>(element::f32, shape);
     auto C = A + B;
-    auto f = make_shared<Function>(Nodes{C, C}, op::Parameters{A, B});
+    auto D = A * B;
+    auto f = make_shared<Function>(Nodes{C, C, D, D, C}, op::Parameters{A, B});
 
     auto manager = runtime::Manager::get("${BACKEND_NAME}");
     auto external = manager->compile(f);
@@ -49,14 +62,21 @@ TEST(${BACKEND_NAME}, aliased_output)
     shared_ptr<runtime::TensorView> b = backend->make_primary_tensor_view(element::f32, shape);
     shared_ptr<runtime::TensorView> out1 = backend->make_primary_tensor_view(element::f32, shape);
     shared_ptr<runtime::TensorView> out2 = backend->make_primary_tensor_view(element::f32, shape);
+    shared_ptr<runtime::TensorView> out3 = backend->make_primary_tensor_view(element::f32, shape);
+    shared_ptr<runtime::TensorView> out4 = backend->make_primary_tensor_view(element::f32, shape);
+    shared_ptr<runtime::TensorView> out5 = backend->make_primary_tensor_view(element::f32, shape);
 
     copy_data(a, vector<float>{0, 1, 2, 3});
     copy_data(b, vector<float>{1, 2, 3, 4});
-    vector<float> expected{1, 3, 5, 7};
+    vector<float> expectedC{1, 3, 5, 7};
+    vector<float> expectedD{0, 2, 6, 12};
 
-    cf->call({a, b}, {out1, out2});
-    EXPECT_EQ(expected, read_vector<float>(out1));
-    EXPECT_EQ(expected, read_vector<float>(out2));
+    cf->call({a, b}, {out1, out2, out3, out4, out5});
+    EXPECT_EQ(expectedC, read_vector<float>(out1));
+    EXPECT_EQ(expectedC, read_vector<float>(out2));
+    EXPECT_EQ(expectedD, read_vector<float>(out3));
+    EXPECT_EQ(expectedD, read_vector<float>(out4));
+    EXPECT_EQ(expectedC, read_vector<float>(out5));
 }
 
 TEST(${BACKEND_NAME}, parameter_as_output)
@@ -4405,6 +4425,87 @@ TEST(${BACKEND_NAME}, max_pool_2d_2channel_2image)
               read_vector<float>(result));
 }
 
+TEST(${BACKEND_NAME}, max_pool_2d_1channel_1image_padded)
+{
+    auto shape_a = Shape{1, 1, 5, 5};
+    auto window_shape = Shape{2, 3};
+    auto window_movement_strides = Strides{1, 1};
+    auto padding_below = Shape{1, 0};
+    auto padding_above = Shape{1, 2};
+    auto A = make_shared<op::Parameter>(element::f32, shape_a);
+    auto shape_r = Shape{1, 1, 6, 5};
+    auto f = make_shared<Function>(
+        make_shared<op::MaxPool>(
+            A, window_shape, window_movement_strides, padding_below, padding_above),
+        op::Parameters{A});
+
+    auto manager = runtime::Manager::get("${BACKEND_NAME}");
+    auto external = manager->compile(f);
+    auto backend = manager->allocate_backend();
+    auto cf = backend->make_call_frame(external);
+
+    // Create some tensors for input/output
+    auto a = backend->make_primary_tensor_view(element::f32, shape_a);
+    copy_data(a,
+              test::NDArray<float, 4>({{{{0, 1, 0, 2, 1},
+                                         {0, 3, 2, 0, 0},
+                                         {2, 0, 0, 0, 1},
+                                         {2, 0, 1, 1, 2},
+                                         {0, 2, 1, 0, 0}}}})
+                  .get_vector());
+    auto result = backend->make_primary_tensor_view(element::f32, shape_r);
+
+    cf->call({a}, {result});
+    EXPECT_EQ((test::NDArray<float, 4>({{{{1, 2, 2, 2, 1},
+                                          {3, 3, 2, 2, 1},
+                                          {3, 3, 2, 1, 1},
+                                          {2, 1, 2, 2, 2},
+                                          {2, 2, 2, 2, 2},
+                                          {2, 2, 1, 0, 0}}}})
+                   .get_vector()),
+              read_vector<float>(result));
+}
+
+// Test to make sure that negative elements and padding are handled properly. Added this because
+// mkldnn calls its padding "zero padding" but apparently that is not technically true (negative
+// values still "win" versus out-of-bounds values), which is good.
+TEST(${BACKEND_NAME}, max_pool_2d_1channel_1image_padded_negative_values)
+{
+    auto shape_a = Shape{
+        1,
+        1,
+        1,
+        14}; // 1 image, 1 channel, 1 row, 14 columns (if it's 1D we don't get mkldnn as of this writing)
+    auto window_shape = Shape{1, 3};
+    auto window_movement_strides = Strides{1, 1};
+    auto padding_below = Shape{0, 1};
+    auto padding_above = Shape{0, 2};
+    auto A = make_shared<op::Parameter>(element::f32, shape_a);
+    auto shape_r = Shape{1, 1, 1, 15};
+    auto f = make_shared<Function>(
+        make_shared<op::MaxPool>(
+            A, window_shape, window_movement_strides, padding_below, padding_above),
+        op::Parameters{A});
+
+    auto manager = runtime::Manager::get("${BACKEND_NAME}");
+    auto external = manager->compile(f);
+    auto backend = manager->allocate_backend();
+    auto cf = backend->make_call_frame(external);
+
+    // Create some tensors for input/output
+    auto a = backend->make_primary_tensor_view(element::f32, shape_a);
+    copy_data(a,
+              test::NDArray<float, 4>{{{{-1, -2, -3, -3, -2, -1, -3, -2, -2, -2, -2, -3, -4, -5}}}}
+                  .get_vector());
+    auto result = backend->make_primary_tensor_view(element::f32, shape_r);
+
+    cf->call({a}, {result});
+    EXPECT_EQ(
+        (test::NDArray<float, 4>({{{{-1, -1, -2, -2, -1, -1, -1, -2, -2, -2, -2, -2, -3, -4, -5}}}})
+             .get_vector()),
+        read_vector<float>(result));
+}
+
 TEST(${BACKEND_NAME}, max_pool_2d_1channel_1image_strided)
 {
     auto shape_a = Shape{1, 1, 8, 8};
@@ -4894,6 +4995,14 @@ TEST(${BACKEND_NAME}, numeric_double_inf)
 
 TEST(${BACKEND_NAME}, abc_tbb)
 {
+    // Force TBB flow graph generation in the CPU backend
+    // This has no effect on other backends
+    bool use_tbb = (getenv("NGRAPH_CPU_USE_TBB") != nullptr);
+    if (!use_tbb)
+    {
+        setenv("NGRAPH_CPU_USE_TBB", "1", 1);
+    }
+
     auto shape = Shape{2, 2};
     auto A = make_shared<op::Parameter>(element::f32, shape);
     auto B = make_shared<op::Parameter>(element::f32, shape);
@@ -4903,11 +5012,6 @@ TEST(${BACKEND_NAME}, abc_tbb)
     auto manager = runtime::Manager::get("${BACKEND_NAME}");
     auto external = manager->compile(f);
     auto backend = manager->allocate_backend();
-    shared_ptr<runtime::cpu::CPU_Backend> cpu_backend = dynamic_pointer_cast<runtime::cpu::CPU_Backend>(backend);
-    if (cpu_backend)
-    {
-        cpu_backend->tbb_enable(true);
-    }
     auto cf = backend->make_call_frame(external);
 
     // Create some tensors for input/output
@@ -4931,6 +5035,11 @@ TEST(${BACKEND_NAME}, abc_tbb)
     cf->call({a, c, b}, {result});
     EXPECT_EQ(read_vector<float>(result),
               (test::NDArray<float, 2>({{50, 72}, {98, 128}})).get_vector());
+
+    if (!use_tbb)
+    {
+        unsetenv("NGRAPH_CPU_USE_TBB");
+    }
 }
 
 //
@@ -5371,82 +5480,137 @@ TEST(${BACKEND_NAME}, select_and_scatter_3d_without_overlap)
         read_vector<float>(result));
 }
 
-template <typename OP, typename T>
+template <typename OP>
 void make_unary_empty_test(const string& backend_name)
 {
     auto shape = Shape{0};
-    auto A = make_shared<op::Parameter>(element::from<T>(), shape);
-    auto f = make_shared<Function>(make_shared<OP>(A), op::Parameters{A});
+
+    op::Parameters params;
+    Nodes result_list;
+    for (size_t i = 0; i < s_known_element_types.size(); i++)
+    {
+        shared_ptr<op::Parameter> p = make_shared<op::Parameter>(s_known_element_types[i], shape);
+        params.push_back(p);
+        result_list.push_back(make_shared<OP>(p));
+    }
+
+    auto f = make_shared<Function>(result_list, params);
 
     auto manager = runtime::Manager::get(backend_name);
     auto external = manager->compile(f);
     auto backend = manager->allocate_backend();
     auto cf = backend->make_call_frame(external);
 
-    auto a = backend->make_primary_tensor_view(element::from<T>(), shape);
-    auto result = backend->make_primary_tensor_view(element::from<T>(), shape);
+    vector<shared_ptr<runtime::TensorView>> inputs;
+    vector<shared_ptr<runtime::TensorView>> outputs;
+    for (size_t i = 0; i < s_known_element_types.size(); i++)
+    {
+        inputs.push_back(backend->make_primary_tensor_view(s_known_element_types[i], shape));
+        outputs.push_back(backend->make_primary_tensor_view(s_known_element_types[i], shape));
+    }
 
-    cf->call({a}, {result});
+    cf->call(inputs, outputs);
 
-    auto in_vec = read_vector<T>(a);
-    auto out_vec = read_vector<T>(result);
+    EXPECT_EQ(read_vector<float>(inputs[0]).size(), 0);
+    EXPECT_EQ(read_vector<double>(inputs[1]).size(), 0);
+    EXPECT_EQ(read_vector<int8_t>(inputs[2]).size(), 0);
+    EXPECT_EQ(read_vector<int16_t>(inputs[3]).size(), 0);
+    EXPECT_EQ(read_vector<int32_t>(inputs[4]).size(), 0);
+    EXPECT_EQ(read_vector<int64_t>(inputs[5]).size(), 0);
+    EXPECT_EQ(read_vector<uint8_t>(inputs[6]).size(), 0);
+    EXPECT_EQ(read_vector<uint16_t>(inputs[7]).size(), 0);
+    EXPECT_EQ(read_vector<uint32_t>(inputs[8]).size(), 0);
+    EXPECT_EQ(read_vector<uint64_t>(inputs[9]).size(), 0);
 
-    EXPECT_EQ(in_vec, out_vec);
+    EXPECT_EQ(read_vector<float>(outputs[0]).size(), 0);
+    EXPECT_EQ(read_vector<double>(outputs[1]).size(), 0);
+    EXPECT_EQ(read_vector<int8_t>(outputs[2]).size(), 0);
+    EXPECT_EQ(read_vector<int16_t>(outputs[3]).size(), 0);
+    EXPECT_EQ(read_vector<int32_t>(outputs[4]).size(), 0);
+    EXPECT_EQ(read_vector<int64_t>(outputs[5]).size(), 0);
+    EXPECT_EQ(read_vector<uint8_t>(outputs[6]).size(), 0);
+    EXPECT_EQ(read_vector<uint16_t>(outputs[7]).size(), 0);
+    EXPECT_EQ(read_vector<uint32_t>(outputs[8]).size(), 0);
+    EXPECT_EQ(read_vector<uint64_t>(outputs[9]).size(), 0);
 }
 
-template <typename OP, typename T>
-void make_binary_empty_test(const string& backend_name)
+template <typename OP>
+void make_binary_empty_test(const string& backend_name, bool is_comparison = false)
 {
     auto shape = Shape{0};
-    auto A = make_shared<op::Parameter>(element::from<T>(), shape);
-    auto B = make_shared<op::Parameter>(element::from<T>(), shape);
-    auto f = make_shared<Function>(make_shared<OP>(A, B), op::Parameters{A, B});
+    op::Parameters A;
+    for (size_t i = 0; i < s_known_element_types.size(); i++)
+    {
+        A.push_back(make_shared<op::Parameter>(s_known_element_types[i], shape));
+    }
+
+    Nodes result_list;
+    for (shared_ptr<op::Parameter> p : A)
+    {
+        result_list.push_back(make_shared<OP>(p, p));
+    }
+
+    auto f = make_shared<Function>(result_list, A);
 
     auto manager = runtime::Manager::get(backend_name);
     auto external = manager->compile(f);
     auto backend = manager->allocate_backend();
     auto cf = backend->make_call_frame(external);
 
-    auto a = backend->make_primary_tensor_view(element::from<T>(), shape);
-    auto b = backend->make_primary_tensor_view(element::from<T>(), shape);
-    auto result = backend->make_primary_tensor_view(element::from<T>(), shape);
+    vector<shared_ptr<runtime::TensorView>> inputs;
+    vector<shared_ptr<runtime::TensorView>> outputs;
+    for (size_t i = 0; i < s_known_element_types.size(); i++)
+    {
+        inputs.push_back(backend->make_primary_tensor_view(s_known_element_types[i], shape));
+        if (is_comparison)
+        {
+            outputs.push_back(backend->make_primary_tensor_view(element::from<char>(), shape));
+        }
+        else
+        {
+            outputs.push_back(backend->make_primary_tensor_view(s_known_element_types[i], shape));
+        }
+    }
 
-    cf->call({a, b}, {result});
+    cf->call(inputs, outputs);
 
-    auto in_vec = read_vector<T>(a);
-    auto out_vec = read_vector<T>(result);
+    EXPECT_EQ(read_vector<float>(inputs[0]).size(), 0);
+    EXPECT_EQ(read_vector<double>(inputs[1]).size(), 0);
+    EXPECT_EQ(read_vector<int8_t>(inputs[2]).size(), 0);
+    EXPECT_EQ(read_vector<int16_t>(inputs[3]).size(), 0);
+    EXPECT_EQ(read_vector<int32_t>(inputs[4]).size(), 0);
+    EXPECT_EQ(read_vector<int64_t>(inputs[5]).size(), 0);
+    EXPECT_EQ(read_vector<uint8_t>(inputs[6]).size(), 0);
+    EXPECT_EQ(read_vector<uint16_t>(inputs[7]).size(), 0);
+    EXPECT_EQ(read_vector<uint32_t>(inputs[8]).size(), 0);
+    EXPECT_EQ(read_vector<uint64_t>(inputs[9]).size(), 0);
 
-    EXPECT_EQ(in_vec, out_vec);
-}
-
-template <typename OP>
-void make_binary_empty_test(const string& backend_name)
-{
-    make_binary_empty_test<OP, float>(backend_name);
-    make_binary_empty_test<OP, double>(backend_name);
-    make_binary_empty_test<OP, int8_t>(backend_name);
-    make_binary_empty_test<OP, int16_t>(backend_name);
-    make_binary_empty_test<OP, int32_t>(backend_name);
-    make_binary_empty_test<OP, int64_t>(backend_name);
-    make_binary_empty_test<OP, uint8_t>(backend_name);
-    make_binary_empty_test<OP, uint16_t>(backend_name);
-    make_binary_empty_test<OP, uint32_t>(backend_name);
-    make_binary_empty_test<OP, uint64_t>(backend_name);
-}
-
-template <typename OP>
-void make_unary_empty_test(const string& backend_name)
-{
-    make_unary_empty_test<OP, float>(backend_name);
-    make_unary_empty_test<OP, double>(backend_name);
-    make_unary_empty_test<OP, int8_t>(backend_name);
-    make_unary_empty_test<OP, int16_t>(backend_name);
-    make_unary_empty_test<OP, int32_t>(backend_name);
-    make_unary_empty_test<OP, int64_t>(backend_name);
-    make_unary_empty_test<OP, uint8_t>(backend_name);
-    make_unary_empty_test<OP, uint16_t>(backend_name);
-    make_unary_empty_test<OP, uint32_t>(backend_name);
-    make_unary_empty_test<OP, uint64_t>(backend_name);
+    if (is_comparison)
+    {
+        EXPECT_EQ(read_vector<char>(outputs[0]).size(), 0);
+        EXPECT_EQ(read_vector<char>(outputs[1]).size(), 0);
+        EXPECT_EQ(read_vector<char>(outputs[2]).size(), 0);
+        EXPECT_EQ(read_vector<char>(outputs[3]).size(), 0);
+        EXPECT_EQ(read_vector<char>(outputs[4]).size(), 0);
+        EXPECT_EQ(read_vector<char>(outputs[5]).size(), 0);
+        EXPECT_EQ(read_vector<char>(outputs[6]).size(), 0);
+        EXPECT_EQ(read_vector<char>(outputs[7]).size(), 0);
+        EXPECT_EQ(read_vector<char>(outputs[8]).size(), 0);
+        EXPECT_EQ(read_vector<char>(outputs[9]).size(), 0);
+    }
+    else
+    {
+        EXPECT_EQ(read_vector<float>(outputs[0]).size(), 0);
+        EXPECT_EQ(read_vector<double>(outputs[1]).size(), 0);
+        EXPECT_EQ(read_vector<int8_t>(outputs[2]).size(), 0);
+        EXPECT_EQ(read_vector<int16_t>(outputs[3]).size(), 0);
+        EXPECT_EQ(read_vector<int32_t>(outputs[4]).size(), 0);
+        EXPECT_EQ(read_vector<int64_t>(outputs[5]).size(), 0);
+        EXPECT_EQ(read_vector<uint8_t>(outputs[6]).size(), 0);
+        EXPECT_EQ(read_vector<uint16_t>(outputs[7]).size(), 0);
+        EXPECT_EQ(read_vector<uint32_t>(outputs[8]).size(), 0);
+        EXPECT_EQ(read_vector<uint64_t>(outputs[9]).size(), 0);
+    }
 }
 
 TEST(${BACKEND_NAME}, zero_sized_abs)
@@ -5481,7 +5645,25 @@ TEST(${BACKEND_NAME}, zero_sized_negative)
 
 TEST(${BACKEND_NAME}, zero_sized_not)
 {
-    make_unary_empty_test<op::Not, char>("${BACKEND_NAME}");
+    auto shape = Shape{0};
+    auto A = make_shared<op::Parameter>(element::from<char>(), shape);
+    auto f = make_shared<Function>(make_shared<op::Not>(A), op::Parameters{A});
+
+    auto manager = runtime::Manager::get("${BACKEND_NAME}");
+    auto external = manager->compile(f);
+    auto backend = manager->allocate_backend();
+    auto cf = backend->make_call_frame(external);
+
+    auto a = backend->make_primary_tensor_view(element::from<char>(), shape);
+    auto result = backend->make_primary_tensor_view(element::from<char>(), shape);
+
+    cf->call({a}, {result});
+
+    auto in_vec = read_vector<char>(a);
+    auto out_vec = read_vector<char>(result);
+
+    EXPECT_EQ(in_vec.size(), 0);
+    EXPECT_EQ(out_vec.size(), 0);
 }
 
 TEST(${BACKEND_NAME}, zero_sized_sign)
@@ -5551,27 +5733,27 @@ TEST(${BACKEND_NAME}, zero_sized_divide)
 
 TEST(${BACKEND_NAME}, zero_sized_eq)
 {
-    make_binary_empty_test<op::Equal>("${BACKEND_NAME}");
+    make_binary_empty_test<op::Equal>("${BACKEND_NAME}", true);
 }
 
 TEST(${BACKEND_NAME}, zero_sized_greater)
 {
-    make_binary_empty_test<op::Greater>("${BACKEND_NAME}");
+    make_binary_empty_test<op::Greater>("${BACKEND_NAME}", true);
 }
 
 TEST(${BACKEND_NAME}, zero_sized_greatereq)
 {
-    make_binary_empty_test<op::GreaterEq>("${BACKEND_NAME}");
+    make_binary_empty_test<op::GreaterEq>("${BACKEND_NAME}", true);
 }
 
 TEST(${BACKEND_NAME}, zero_sized_less)
 {
-    make_binary_empty_test<op::Less>("${BACKEND_NAME}");
+    make_binary_empty_test<op::Less>("${BACKEND_NAME}", true);
 }
 
 TEST(${BACKEND_NAME}, zero_sized_lesseq)
 {
-    make_binary_empty_test<op::LessEq>("${BACKEND_NAME}");
+    make_binary_empty_test<op::LessEq>("${BACKEND_NAME}", true);
 }
 
 TEST(${BACKEND_NAME}, zero_sized_maximum)
@@ -5591,7 +5773,7 @@ TEST(${BACKEND_NAME}, zero_sized_multiply)
 
 TEST(${BACKEND_NAME}, zero_sized_not_equal)
 {
-    make_binary_empty_test<op::NotEqual>("${BACKEND_NAME}");
+    make_binary_empty_test<op::NotEqual>("${BACKEND_NAME}", true);
 }
 
 TEST(${BACKEND_NAME}, zero_sized_power)
@@ -5602,6 +5784,47 @@ TEST(${BACKEND_NAME}, zero_sized_power)
 TEST(${BACKEND_NAME}, zero_sized_subtract)
 {
     make_binary_empty_test<op::Subtract>("${BACKEND_NAME}");
+}
+
+TEST(${BACKEND_NAME}, convolution_outlining)
+{
+    auto shape_a = Shape{1, 2, 2, 2};
+    auto A = make_shared<op::Parameter>(element::f32, shape_a);
+    auto shape_b = Shape{2, 2, 1, 1};
+    auto B = make_shared<op::Parameter>(element::f32, shape_b);
+    auto shape_r = Shape{1, 2, 2, 2};
+    auto conv1 = make_shared<op::Convolution>(A,
+                                              B,
+                                              Strides{1, 1},
+                                              Strides{1, 1},
+                                              CoordinateDiff{0, 0},
+                                              CoordinateDiff{0, 0},
+                                              Strides{1, 1});
+    auto conv2 = make_shared<op::Convolution>(conv1,
+                                              B,
+                                              Strides{1, 1},
+                                              Strides{1, 1},
+                                              CoordinateDiff{0, 0},
+                                              CoordinateDiff{0, 0},
+                                              Strides{1, 1});
+    auto f = make_shared<Function>(conv2, op::Parameters{A, B});
+
+    auto manager = runtime::Manager::get("${BACKEND_NAME}");
+    auto external = manager->compile(f);
+    auto backend = manager->allocate_backend();
+    auto cf = backend->make_call_frame(external);
+
+    // Create some tensors for input/output
+    auto a = backend->make_primary_tensor_view(element::f32, shape_a);
+    copy_data(a, vector<float>{1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f});
+    auto b = backend->make_primary_tensor_view(element::f32, shape_b);
+    copy_data(b, vector<float>{1.0f, 1.0f, 1.0f, 1.0f});
+    auto result = backend->make_primary_tensor_view(element::f32, shape_r);
+
+    vector<float> expected_result{4.0f, 4.0f, 4.0f, 4.0f, 4.0f, 4.0f, 4.0f, 4.0f};
+
+    cf->call({a, b}, {result});
+    EXPECT_EQ(vector<float>{expected_result}, read_vector<float>(result));
 }
 
 TEST(${BACKEND_NAME}, avg_pool_1d_1channel_1image)
