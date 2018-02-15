@@ -103,6 +103,7 @@ set (SRC
     runtime/interpreter/int_manager.cpp
     runtime/manager.cpp
     runtime/tensor_view.cpp
+    serialize_xml.cpp
     serializer.cpp
     shape.cpp
     types/element_type.cpp
