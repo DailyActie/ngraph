@@ -76,11 +76,11 @@ set (SRC
     ops/sum.cpp
     ops/tan.cpp
     ops/tanh.cpp
-    ops/util/binary_elementwise_arithmetic.cpp 
-    ops/util/binary_elementwise_comparison.cpp 
-    ops/util/binary_elementwise.cpp 
-    ops/util/requires_tensor_view_args.cpp 
-    ops/util/unary_elementwise_arithmetic.cpp 
+    ops/util/binary_elementwise_arithmetic.cpp
+    ops/util/binary_elementwise_comparison.cpp
+    ops/util/binary_elementwise.cpp
+    ops/util/requires_tensor_view_args.cpp
+    ops/util/unary_elementwise_arithmetic.cpp
     ops/util/unary_elementwise.cpp
     pass/dump_sorted.cpp
     pass/graph_rewrite.cpp
@@ -317,6 +317,8 @@ if (NGRAPH_ARGON_ENABLE)
     add_dependencies(ngraph ext_argon_transformer)
     add_dependencies(ext_argon_transformer ext_llvm)
 endif()
+
+add_dependencies(ngraph ext_llvm ext_eigen ext_mkldnn ext_xml)
 
 #-----------------------------------------------------------------------------------------------
 # Installation logic...
