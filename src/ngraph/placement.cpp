@@ -561,21 +561,20 @@ void cluster_util::node_consistency_check_pass(const vector<shared_ptr<Cluster>>
 //     return clusters;
 // }
 
-
 static shared_ptr<Node> take_independent_node_with_placement_priority(
     const unordered_map<Placement, list<shared_ptr<Node>>>& independent_nodes_by_placement,
     Placement placement)
 {
     shared_ptr<Node> selected_node = nullptr;
-    if (independent_nodes_by_placement.find(placement) != independent_nodes_by_placement.end()
-        && independent_nodes_by_placement.at(placement).size() != 0)
+    if (independent_nodes_by_placement.find(placement) != independent_nodes_by_placement.end() &&
+        independent_nodes_by_placement.at(placement).size() != 0)
     {
         selected_node = independent_nodes_by_placement.at(placement).front();
         independent_nodes_by_placement.at(placement).pop_front();
     }
     else
     {
-        for (auto it: independent_nodes_by_placement)
+        for (auto it : independent_nodes_by_placement)
         {
             if (it.second.size() > 0)
             {
@@ -596,7 +595,7 @@ vector<shared_ptr<Cluster>> cluster_util::split_function_to_clusters(const share
     list<shared_ptr<ngraph::Node>> sorted_nodes;
     Placement previous_placement = Placement::DEFAULT;
 
-    for (shared_ptr<Node> node: f->get_ops())
+    for (shared_ptr<Node> node : f->get_ops())
     {
         size_t dependency_count = node->get_input_ops().size();
         node_dependency_count[node] = dependency_count;
@@ -605,8 +604,8 @@ vector<shared_ptr<Cluster>> cluster_util::split_function_to_clusters(const share
             independent_nodes_by_placement[node->get_placement()].push_back(node);
         }
     }
-    while(shared_ptr<Node> independent_node = take_independent_node_with_placement_priority(
-        independent_nodes_by_placement, previous_placement))
+    while (shared_ptr<Node> independent_node = take_independent_node_with_placement_priority(
+               independent_nodes_by_placement, previous_placement))
     {
         previous_placement = independent_node->get_placement();
         sorted_nodes.push_back(previous_placement);
@@ -624,7 +623,7 @@ vector<shared_ptr<Cluster>> cluster_util::split_function_to_clusters(const share
     // Build clusters from the sorted_nodes
     previous_placement = Placement::DEFAULT;
     vector<shared_ptr<Cluster>> clusters;
-    for (shared_ptr<Node> node: sorted_nodes)
+    for (shared_ptr<Node> node : sorted_nodes)
     {
         Placement node_placement = node->get_placement();
         if (node_placement != previous_placement)
