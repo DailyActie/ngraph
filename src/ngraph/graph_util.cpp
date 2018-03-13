@@ -163,13 +163,13 @@ std::list<std::shared_ptr<ngraph::Node>>
     ngraph::topological_sort(const std::list<std::shared_ptr<Node>>& nodes)
 {
     deque<ngraph::Node*> independent_nodes;
-    unordered_map<const ngraph::Node*, size_t> node_depencency_count;
+    unordered_map<const ngraph::Node*, size_t> node_dependency_count;
     unordered_map<ngraph::Node*, shared_ptr<ngraph::Node>> node_map;
 
     for (auto node : nodes)
     {
         node_map[node.get()] = node;
-        node_depencency_count[node.get()] = node->get_input_ops().size();
+        node_dependency_count[node.get()] = node->get_input_ops().size();
         if (node->get_input_ops().size() == 0)
         {
             independent_nodes.push_back(node.get());
@@ -185,8 +185,8 @@ std::list<std::shared_ptr<ngraph::Node>>
 
         for (auto user : independent_node->users())
         {
-            node_depencency_count[user] -= 1;
-            size_t count = node_depencency_count[user];
+            node_dependency_count[user] -= 1;
+            size_t count = node_dependency_count[user];
             if (count == 0)
             {
                 independent_nodes.push_back(user);

@@ -540,23 +540,99 @@ void cluster_util::node_consistency_check_pass(const vector<shared_ptr<Cluster>>
     }
 }
 
+// vector<shared_ptr<Cluster>> cluster_util::split_function_to_clusters(const shared_ptr<Function>& f)
+// {
+//     // Init node cluster, every cluster contains one node
+//     vector<shared_ptr<Cluster>> clusters = cluster_util::build_singleton_clusters(f);
+//     node_consistency_check_pass(clusters, f);
+
+//     // Run cluster optimization passes
+//     // TODO: Currently runs node_consistency_check_pass for safety
+//     //       We only need to run once at the end
+//     cluster_util::merge_adjacent_clusters_pass(clusters);
+//     cluster_util::node_consistency_check_pass(clusters, f);
+
+//     cluster_util::merge_disjoint_clusters_pass(clusters);
+//     cluster_util::node_consistency_check_pass(clusters, f);
+
+//     cluster_util::topological_sort_clusters_pass(clusters);
+//     cluster_util::node_consistency_check_pass(clusters, f);
+
+//     return clusters;
+// }
+
+
+static shared_ptr<Node> take_independent_node_with_placement_priority(
+    const unordered_map<Placement, list<shared_ptr<Node>>>& independent_nodes_by_placement,
+    Placement placement)
+{
+    shared_ptr<Node> selected_node = nullptr;
+    if (independent_nodes_by_placement.find(placement) != independent_nodes_by_placement.end()
+        && independent_nodes_by_placement.at(placement).size() != 0)
+    {
+        selected_node = independent_nodes_by_placement.at(placement).front();
+        independent_nodes_by_placement.at(placement).pop_front();
+    }
+    else
+    {
+        for (auto it: independent_nodes_by_placement)
+        {
+            if (it.second.size() > 0)
+            {
+                selected_node = it.second.front();
+                it.second.pop_front();
+            }
+        }
+    }
+    return selected_node;
+}
+
 vector<shared_ptr<Cluster>> cluster_util::split_function_to_clusters(const shared_ptr<Function>& f)
 {
-    // Init node cluster, every cluster contains one node
-    vector<shared_ptr<Cluster>> clusters = cluster_util::build_singleton_clusters(f);
-    node_consistency_check_pass(clusters, f);
+    // Topologically sort nodes by picking independent node with the same placement as the
+    // previously picked node greedily
+    unordered_map<Placement, list<shared_ptr<Node>>> independent_nodes_by_placement;
+    unordered_map<Placement, size_t> node_dependency_count;
+    list<shared_ptr<ngraph::Node>> sorted_nodes;
+    Placement previous_placement = Placement::DEFAULT;
 
-    // Run cluster optimization passes
-    // TODO: Currently runs node_consistency_check_pass for safety
-    //       We only need to run once at the end
-    cluster_util::merge_adjacent_clusters_pass(clusters);
-    cluster_util::node_consistency_check_pass(clusters, f);
+    for (shared_ptr<Node> node: f->get_ops())
+    {
+        size_t dependency_count = node->get_input_ops().size();
+        node_dependency_count[node] = dependency_count;
+        if (dependency_count == 0)
+        {
+            independent_nodes_by_placement[node->get_placement()].push_back(node);
+        }
+    }
+    while(shared_ptr<Node> independent_node = take_independent_node_with_placement_priority(
+        independent_nodes_by_placement, previous_placement))
+    {
+        previous_placement = independent_node->get_placement();
+        sorted_nodes.push_back(previous_placement);
 
-    cluster_util::merge_disjoint_clusters_pass(clusters);
-    cluster_util::node_consistency_check_pass(clusters, f);
+        for (auto user_node : independent_node->users())
+        {
+            node_dependency_count.at(user_node) -= 1;
+            if (node_dependency_count.at(user_node) == 0)
+            {
+                independent_nodes_by_placement[user_node->get_placement()].push_back(user_node);
+            }
+        }
+    }
 
-    cluster_util::topological_sort_clusters_pass(clusters);
-    cluster_util::node_consistency_check_pass(clusters, f);
+    // Build clusters from the sorted_nodes
+    previous_placement = Placement::DEFAULT;
+    vector<shared_ptr<Cluster>> clusters;
+    for (shared_ptr<Node> node: sorted_nodes)
+    {
+        Placement node_placement = node->get_placement();
+        if (node_placement != previous_placement)
+        {
+            clusters.push_back(Cluster());
+        }
+        clusters.back().insert_node(node);
+    }
 
     return clusters;
 }
