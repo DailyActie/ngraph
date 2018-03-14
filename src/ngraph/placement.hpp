@@ -58,13 +58,6 @@ namespace ngraph
         std::unordered_set<std::shared_ptr<Node>> m_nodes;
     };
 
-    namespace cluster_util
-    {
-        // Cluster graph utils
-        std::vector<std::shared_ptr<Cluster>>
-            split_function_to_clusters(const std::shared_ptr<Function>& f);
-    }
-
     std::string placement_to_string(Placement placement);
 
     // Split function to function(s) with unique placement

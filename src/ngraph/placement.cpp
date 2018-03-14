@@ -14,14 +14,14 @@
 * limitations under the License.
 *******************************************************************************/
 
+#include <deque>
+#include <sstream>
+
 #include "ngraph/placement.hpp"
 #include "ngraph/function.hpp"
 #include "ngraph/graph_util.hpp"
 #include "ngraph/node.hpp"
 #include "ngraph/util.hpp"
-
-#include <deque>
-#include <sstream>
 
 using namespace std;
 using namespace ngraph;
@@ -80,7 +80,7 @@ static Node* take_independent_node_with_placement_priority(
     return selected_node;
 }
 
-vector<shared_ptr<Cluster>> cluster_util::split_function_to_clusters(const shared_ptr<Function>& f)
+static vector<unordered_set<shared_ptr<Node>>> split_function_to_clusters(const shared_ptr<Function>& f)
 {
     // Topologically sort nodes by picking independent node with the same placement as the
     // previously picked node greedily
@@ -119,15 +119,16 @@ vector<shared_ptr<Cluster>> cluster_util::split_function_to_clusters(const share
 
     // Build clusters from the sorted_nodes
     previous_placement = Placement::DEFAULT;
-    vector<shared_ptr<Cluster>> clusters;
+    vector<unordered_set<shared_ptr<Node>>> clusters;
     for (shared_ptr<Node> node : sorted_nodes)
     {
         Placement node_placement = node->get_placement();
         if (node_placement != previous_placement)
         {
-            clusters.push_back(make_shared<Cluster>());
+            unordered_set<shared_ptr<Node>> new_cluster;
+            clusters.push_back(new_cluster);
         }
-        clusters.back()->insert_node(node);
+        clusters.back().insert(node);
         previous_placement = node_placement;
     }
 
@@ -143,7 +144,7 @@ pair<vector<shared_ptr<Function>>, unordered_map<shared_ptr<op::Parameter>, shar
     ngraph::split_function_by_placement(shared_ptr<Function> f)
 {
     // Split functions to clusters of nodes that can be computed together
-    vector<shared_ptr<Cluster>> clusters = cluster_util::split_function_to_clusters(f);
+    vector<unordered_set<shared_ptr<Node>>> clusters = split_function_to_clusters(f);
 
     // Map from (intermediate) parameter to result node, for guiding data copy among devices
     unordered_map<shared_ptr<op::Parameter>, shared_ptr<op::Result>> map_parameter_to_result;
@@ -151,12 +152,12 @@ pair<vector<shared_ptr<Function>>, unordered_map<shared_ptr<op::Parameter>, shar
     // Split neighboring nodes if they belong to different clusters
     // TODO: optimization to group multiple result node from the same source,
     //       and to group the parameter node in the same cluster with the same result node source
-    unordered_map<shared_ptr<Node>, shared_ptr<Cluster>> map_node_to_cluster;
-    for (auto cluster : clusters)
+    unordered_map<shared_ptr<Node>, unordered_set<shared_ptr<Node>>*> map_node_to_cluster;
+    for (auto& cluster : clusters)
     {
-        for (auto node : cluster->get_nodes())
+        for (auto node : cluster)
         {
-            map_node_to_cluster[node] = cluster;
+            map_node_to_cluster[node] = &cluster;
         }
     }
     for (auto dst_node : f->get_ordered_ops())
@@ -175,8 +176,8 @@ pair<vector<shared_ptr<Function>>, unordered_map<shared_ptr<op::Parameter>, shar
                 map_parameter_to_result[par_node] = res_node;
 
                 // Insert newly created nodes into clusters
-                src_cluster->insert_node(res_node);
-                dst_cluster->insert_node(par_node);
+                src_cluster->insert(res_node);
+                dst_cluster->insert(par_node);
             }
         }
     }
@@ -187,7 +188,7 @@ pair<vector<shared_ptr<Function>>, unordered_map<shared_ptr<op::Parameter>, shar
     {
         op::ParameterVector par_vector;
         ResultVector res_vector;
-        for (auto node : cluster->get_nodes())
+        for (auto node : cluster)
         {
             if (auto res_node = dynamic_pointer_cast<op::Result>(node))
             {
