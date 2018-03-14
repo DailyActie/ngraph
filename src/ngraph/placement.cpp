@@ -17,10 +17,10 @@
 #include <deque>
 #include <sstream>
 
-#include "ngraph/placement.hpp"
 #include "ngraph/function.hpp"
 #include "ngraph/graph_util.hpp"
 #include "ngraph/node.hpp"
+#include "ngraph/placement.hpp"
 #include "ngraph/util.hpp"
 
 using namespace std;
@@ -62,7 +62,8 @@ static Node* take_independent_node_with_placement_priority(
     return selected_node;
 }
 
-static vector<unordered_set<shared_ptr<Node>>> split_function_to_clusters(const shared_ptr<Function>& f)
+static vector<unordered_set<shared_ptr<Node>>>
+    split_function_to_clusters(const shared_ptr<Function>& f)
 {
     // Topologically sort nodes by picking independent node with the same placement as the
     // previously picked node greedily
@@ -123,7 +124,7 @@ static vector<unordered_set<shared_ptr<Node>>> split_function_to_clusters(const 
 // For nested functions, we only consider the ops in the main function that represent calling of the
 // nested functions.
 pair<vector<shared_ptr<Function>>, unordered_map<shared_ptr<op::Parameter>, shared_ptr<op::Result>>>
-    ngraph::split_function_by_placement(shared_ptr<Function> f)
+    ngraph::split_function_by_placement(const shared_ptr<Function>& f)
 {
     // Split functions to clusters of nodes that can be computed together
     vector<unordered_set<shared_ptr<Node>>> clusters = split_function_to_clusters(f);
