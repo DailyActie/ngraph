@@ -541,8 +541,7 @@ void cluster_util::node_consistency_check_pass(const vector<shared_ptr<Cluster>>
 }
 
 static Node* take_independent_node_with_placement_priority(
-    map<Placement, deque<Node*>>& independent_nodes_by_placement,
-    Placement placement)
+    map<Placement, deque<Node*>>& independent_nodes_by_placement, Placement placement)
 {
     Node* selected_node = nullptr;
     if (independent_nodes_by_placement.find(placement) != independent_nodes_by_placement.end() &&
@@ -565,7 +564,7 @@ static Node* take_independent_node_with_placement_priority(
     return selected_node;
 }
 
-static vector<shared_ptr<Cluster>> split_function_to_clusters_v2(const shared_ptr<Function>& f)
+vector<shared_ptr<Cluster>> cluster_util::split_function_to_clusters(const shared_ptr<Function>& f)
 {
     // Topologically sort nodes by picking independent node with the same placement as the
     // previously picked node greedily
@@ -587,7 +586,7 @@ static vector<shared_ptr<Cluster>> split_function_to_clusters_v2(const shared_pt
     list<shared_ptr<Node>> sorted_nodes;
     Placement previous_placement = Placement::DEFAULT;
     while (Node* independent_node = take_independent_node_with_placement_priority(
-           independent_nodes_by_placement, previous_placement))
+               independent_nodes_by_placement, previous_placement))
     {
         previous_placement = independent_node->get_placement();
         sorted_nodes.push_back(node_map.at(independent_node));
@@ -617,56 +616,6 @@ static vector<shared_ptr<Cluster>> split_function_to_clusters_v2(const shared_pt
     }
 
     return clusters;
-}
-
-static vector<shared_ptr<Cluster>> split_function_to_clusters_v1(const shared_ptr<Function>& f)
-{
-    // Init node cluster, every cluster contains one node
-    vector<shared_ptr<Cluster>> clusters = cluster_util::build_singleton_clusters(f);
-    cluster_util::node_consistency_check_pass(clusters, f);
-
-    // Run cluster optimization passes
-    // TODO: Currently runs node_consistency_check_pass for safety
-    //       We only need to run once at the end
-    cluster_util::merge_adjacent_clusters_pass(clusters);
-    cluster_util::node_consistency_check_pass(clusters, f);
-
-    cluster_util::merge_disjoint_clusters_pass(clusters);
-    cluster_util::node_consistency_check_pass(clusters, f);
-
-    cluster_util::topological_sort_clusters_pass(clusters);
-    cluster_util::node_consistency_check_pass(clusters, f);
-
-    return clusters;
-}
-
-vector<shared_ptr<Cluster>> cluster_util::split_function_to_clusters(const shared_ptr<Function>& f)
-{
-    auto clusters_v1 = split_function_to_clusters_v1(f);
-    NGRAPH_INFO << "V1";
-    for (auto cluster: clusters_v1)
-    {
-        NGRAPH_INFO << "[Cluster] " << cluster->get_name();
-        for (auto node: cluster->get_nodes())
-        {
-            NGRAPH_INFO << node->get_name() << " " << placement_to_string(node->get_placement());
-        }
-    }
-
-    NGRAPH_INFO;
-    NGRAPH_INFO << "V2";
-    auto clusters_v2 = split_function_to_clusters_v2(f);
-    for (auto cluster: clusters_v2)
-    {
-        NGRAPH_INFO << "[Cluster] " << cluster->get_name();
-        for (auto node: cluster->get_nodes())
-        {
-            NGRAPH_INFO << node->get_name() << " " << placement_to_string(node->get_placement());
-        }
-    }
-
-
-    return clusters_v2;
 }
 
 // Split function by placement, maximizing the span each subgraph. Each subgraph will be placed in
