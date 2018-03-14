@@ -38,10 +38,7 @@ std::string ngraph::placement_to_string(Placement placement)
     }
 }
 
-atomic<size_t> Cluster::m_next_instance_id(0);
-
 Cluster::Cluster()
-    : m_instance_id(m_next_instance_id.fetch_add(1))
 {
 }
 

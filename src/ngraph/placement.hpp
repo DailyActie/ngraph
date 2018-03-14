@@ -52,12 +52,9 @@ namespace ngraph
         // Nodes
         void insert_node(const std::shared_ptr<Node>& node);
         const std::unordered_set<std::shared_ptr<Node>>& get_nodes() const { return m_nodes; }
-        void clear_nodes() { m_nodes.clear(); }
         size_t size() const { return m_nodes.size(); }
 
     protected:
-        size_t m_instance_id;
-        static std::atomic<size_t> m_next_instance_id;
         std::unordered_set<std::shared_ptr<Node>> m_nodes;
     };
 
