@@ -32,6 +32,7 @@ namespace ngraph
     namespace op
     {
         class Parameter;
+        class Result;
     }
 
     enum class Placement
@@ -110,4 +111,10 @@ namespace ngraph
     }
 
     std::string placement_to_string(Placement placement);
+
+    // Split function to function(s) with unique placement
+    std::pair<std::vector<std::shared_ptr<Function>>,
+              std::unordered_map<std::shared_ptr<op::Parameter>, std::shared_ptr<op::Result>>>
+        split_function_by_placement(std::shared_ptr<Function> f);
+
 }

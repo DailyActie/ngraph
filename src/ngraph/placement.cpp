@@ -668,3 +668,74 @@ vector<shared_ptr<Cluster>> cluster_util::split_function_to_clusters(const share
 
     return clusters_v2;
 }
+
+// Split function by placement, maximizing the span each subgraph. Each subgraph will be placed in
+// a single device.
+//
+// For nested functions, we only consider the ops in the main function that represent calling of the
+// nested functions.
+pair<vector<shared_ptr<Function>>, unordered_map<shared_ptr<op::Parameter>, shared_ptr<op::Result>>>
+    ngraph::split_function_by_placement(shared_ptr<Function> f)
+{
+    // Split functions to clusters of nodes that can be computed together
+    vector<shared_ptr<Cluster>> clusters = cluster_util::split_function_to_clusters(f);
+
+    // Map from (intermediate) parameter to result node, for guiding data copy among devices
+    unordered_map<shared_ptr<op::Parameter>, shared_ptr<op::Result>> map_parameter_to_result;
+
+    // Split neighboring nodes if they belong to different clusters
+    // TODO: optimization to group multiple result node from the same source,
+    //       and to group the parameter node in the same cluster with the same result node source
+    unordered_map<shared_ptr<Node>, shared_ptr<Cluster>> map_node_to_cluster;
+    for (auto cluster : clusters)
+    {
+        for (auto node : cluster->get_nodes())
+        {
+            map_node_to_cluster[node] = cluster;
+        }
+    }
+    for (auto dst_node : f->get_ordered_ops())
+    {
+        for (auto src_node : dst_node->get_input_ops())
+        {
+            auto src_cluster = map_node_to_cluster.at(src_node);
+            auto dst_cluster = map_node_to_cluster.at(dst_node);
+            if (src_cluster != dst_cluster)
+            {
+                // Split src_node and dst_node
+                pair<shared_ptr<op::Result>, shared_ptr<op::Parameter>> res_par_pair =
+                    insert_result_parameter_split(src_node, dst_node);
+                shared_ptr<op::Result> res_node = res_par_pair.first;
+                shared_ptr<op::Parameter> par_node = res_par_pair.second;
+                map_parameter_to_result[par_node] = res_node;
+
+                // Insert newly created nodes into clusters
+                src_cluster->insert_node(res_node);
+                dst_cluster->insert_node(par_node);
+            }
+        }
+    }
+
+    // Create functions from clusters
+    vector<shared_ptr<Function>> sub_functions;
+    for (auto cluster : clusters)
+    {
+        op::ParameterVector par_vector;
+        ResultVector res_vector;
+        for (auto node : cluster->get_nodes())
+        {
+            if (auto res_node = dynamic_pointer_cast<op::Result>(node))
+            {
+                res_vector.push_back(res_node);
+            }
+            else if (auto par_node = dynamic_pointer_cast<op::Parameter>(node))
+            {
+                par_vector.push_back(par_node);
+            }
+        }
+        auto sub_function = make_shared<Function>(res_vector, par_vector);
+        sub_functions.push_back(sub_function);
+    }
+
+    return make_pair(sub_functions, map_parameter_to_result);
+}
