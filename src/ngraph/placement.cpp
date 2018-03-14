@@ -38,24 +38,6 @@ std::string ngraph::placement_to_string(Placement placement)
     }
 }
 
-Cluster::Cluster()
-{
-}
-
-Cluster::Cluster(const unordered_set<shared_ptr<Node>>& nodes)
-    : Cluster()
-{
-    for (auto node : nodes)
-    {
-        insert_node(node);
-    }
-}
-
-void Cluster::insert_node(const std::shared_ptr<Node>& node)
-{
-    m_nodes.insert(node);
-}
-
 static Node* take_independent_node_with_placement_priority(
     map<Placement, deque<Node*>>& independent_nodes_by_placement, Placement placement)
 {

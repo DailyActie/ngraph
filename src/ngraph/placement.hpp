@@ -44,25 +44,10 @@ namespace ngraph
         ARGON,
     };
 
-    class Cluster
-    {
-    public:
-        Cluster();
-        Cluster(const std::unordered_set<std::shared_ptr<Node>>& nodes);
-        // Nodes
-        void insert_node(const std::shared_ptr<Node>& node);
-        const std::unordered_set<std::shared_ptr<Node>>& get_nodes() const { return m_nodes; }
-        size_t size() const { return m_nodes.size(); }
-
-    protected:
-        std::unordered_set<std::shared_ptr<Node>> m_nodes;
-    };
-
     std::string placement_to_string(Placement placement);
 
     // Split function to function(s) with unique placement
     std::pair<std::vector<std::shared_ptr<Function>>,
               std::unordered_map<std::shared_ptr<op::Parameter>, std::shared_ptr<op::Result>>>
         split_function_by_placement(std::shared_ptr<Function> f);
-
 }
