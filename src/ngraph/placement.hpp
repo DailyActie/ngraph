@@ -49,43 +49,16 @@ namespace ngraph
     public:
         Cluster();
         Cluster(const std::unordered_set<std::shared_ptr<Node>>& nodes);
-        Placement get_placement() const { return m_placement; }
-        std::string get_name() const;
         // Nodes
         void insert_node(const std::shared_ptr<Node>& node);
         const std::unordered_set<std::shared_ptr<Node>>& get_nodes() const { return m_nodes; }
         void clear_nodes() { m_nodes.clear(); }
         size_t size() const { return m_nodes.size(); }
-        // Children
-        const std::unordered_set<std::shared_ptr<Cluster>>& get_children() const
-        {
-            return m_children;
-        }
-        void insert_child(const std::shared_ptr<Cluster>& cluster);
-        void remove_child(const std::shared_ptr<Cluster>& cluster);
-        void remove_child_if_exists(const std::shared_ptr<Cluster>& cluster);
-        bool exist_child(const std::shared_ptr<Cluster>& cluster) const;
-        void clear_children() { m_children.clear(); }
-        // Parents
-        const std::unordered_set<std::shared_ptr<Cluster>>& get_parents() const
-        {
-            return m_parents;
-        }
-        void insert_parent(const std::shared_ptr<Cluster>& cluster);
-        void remove_parent(const std::shared_ptr<Cluster>& cluster);
-        void remove_parent_if_exists(const std::shared_ptr<Cluster>& cluster);
-        bool exist_parent(const std::shared_ptr<Cluster>& cluster) const;
-        void clear_parents() { m_parents.clear(); }
-        // Debugging support
-        std::string get_debug_node_names() const;
 
     protected:
         size_t m_instance_id;
         static std::atomic<size_t> m_next_instance_id;
         std::unordered_set<std::shared_ptr<Node>> m_nodes;
-        std::unordered_set<std::shared_ptr<Cluster>> m_children;
-        std::unordered_set<std::shared_ptr<Cluster>> m_parents;
-        Placement m_placement = Placement::DEFAULT;
     };
 
     namespace cluster_util

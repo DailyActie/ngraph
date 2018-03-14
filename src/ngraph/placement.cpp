@@ -48,98 +48,15 @@ Cluster::Cluster()
 Cluster::Cluster(const unordered_set<shared_ptr<Node>>& nodes)
     : Cluster()
 {
-    // Check placement consistency by calling insert_node()
     for (auto node : nodes)
     {
         insert_node(node);
     }
 }
 
-string Cluster::get_name() const
-{
-    return "Cluster_" + to_string(m_instance_id);
-}
-
-string Cluster::get_debug_node_names() const
-{
-    vector<string> node_names;
-    for (auto node : m_nodes)
-    {
-        node_names.push_back(node->get_name());
-    }
-
-    std::stringstream ss;
-    ss << "[" << get_name() << "(" << placement_to_string(m_placement) << ")]{";
-    ss << join(node_names);
-    ss << "}";
-    return ss.str();
-}
-
 void Cluster::insert_node(const std::shared_ptr<Node>& node)
 {
-    Placement node_placement = node->get_placement();
-    if (node_placement == Placement::DEFAULT)
-    {
-        throw ngraph_error("Node " + node->get_name() + "has DEFAULT placement." +
-                           "A Node must have a device placement to be added to a Cluster.");
-    }
-    if (this->size() == 0)
-    {
-        m_placement = node_placement;
-    }
-    else if (m_placement != node_placement)
-    {
-        throw ngraph_error("Node's placement different from cluster's placement");
-    }
     m_nodes.insert(node);
-}
-
-void Cluster::insert_child(const shared_ptr<Cluster>& child)
-{
-    m_children.insert(child);
-}
-
-void Cluster::remove_child(const shared_ptr<Cluster>& child)
-{
-    if (m_children.find(child) == m_children.end())
-    {
-        throw ngraph_error("The child cluster to remove is not a child.");
-    }
-    m_children.erase(child);
-}
-
-void Cluster::remove_child_if_exists(const shared_ptr<Cluster>& child)
-{
-    m_children.erase(child);
-}
-
-bool Cluster::exist_child(const shared_ptr<Cluster>& child) const
-{
-    return m_children.find(child) != m_children.end();
-}
-
-void Cluster::insert_parent(const shared_ptr<Cluster>& parent)
-{
-    m_parents.insert(parent);
-}
-
-void Cluster::remove_parent(const shared_ptr<Cluster>& parent)
-{
-    if (m_parents.find(parent) == m_parents.end())
-    {
-        throw ngraph_error("The parent cluster to remove is not a parent.");
-    }
-    m_parents.erase(parent);
-}
-
-void Cluster::remove_parent_if_exists(const shared_ptr<Cluster>& parent)
-{
-    m_parents.erase(parent);
-}
-
-bool Cluster::exist_parent(const shared_ptr<Cluster>& parent) const
-{
-    return m_parents.find(parent) != m_parents.end();
 }
 
 static Node* take_independent_node_with_placement_priority(
