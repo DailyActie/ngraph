@@ -63,7 +63,7 @@ static Node* take_independent_node_with_placement_priority(
 }
 
 static vector<unordered_set<shared_ptr<Node>>>
-    split_function_to_clusters(const shared_ptr<Function>& f)
+    group_function_nodes_to_clusters(const shared_ptr<Function>& f)
 {
     // Topologically sort nodes by picking independent node with the same placement as the
     // previously picked node greedily
@@ -127,7 +127,7 @@ pair<vector<shared_ptr<Function>>, unordered_map<shared_ptr<op::Parameter>, shar
     ngraph::split_function_by_placement(const shared_ptr<Function>& f)
 {
     // Split functions to clusters of nodes that can be computed together
-    vector<unordered_set<shared_ptr<Node>>> clusters = split_function_to_clusters(f);
+    vector<unordered_set<shared_ptr<Node>>> clusters = group_function_nodes_to_clusters(f);
 
     // Map from (intermediate) parameter to result node, for guiding data copy among devices
     unordered_map<shared_ptr<op::Parameter>, shared_ptr<op::Result>> map_parameter_to_result;
