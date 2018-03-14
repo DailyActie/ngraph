@@ -93,21 +93,6 @@ namespace ngraph
         // Cluster graph utils
         std::vector<std::shared_ptr<Cluster>>
             split_function_to_clusters(const std::shared_ptr<Function>& f);
-        std::shared_ptr<Cluster> merge_clusters(const std::shared_ptr<Cluster>& src_cluster,
-                                                const std::shared_ptr<Cluster>& dst_cluster);
-        bool is_reachable_from_children_ptrs(const std::shared_ptr<Cluster>& src_cluster,
-                                             const std::shared_ptr<Cluster>& dst_cluster);
-        bool is_edge_contractable(const std::shared_ptr<Cluster>& src_cluster,
-                                  const std::shared_ptr<Cluster>& dst_cluster);
-        std::vector<std::shared_ptr<Cluster>>
-            build_singleton_clusters(const std::shared_ptr<Function>& f);
-
-        // Cluster passes
-        void merge_adjacent_clusters_pass(std::vector<std::shared_ptr<Cluster>>& clusters);
-        void merge_disjoint_clusters_pass(std::vector<std::shared_ptr<Cluster>>& clusters);
-        void topological_sort_clusters_pass(std::vector<std::shared_ptr<Cluster>>& clusters);
-        void node_consistency_check_pass(const std::vector<std::shared_ptr<Cluster>>& clusters,
-                                         const std::shared_ptr<Function>& f);
     }
 
     std::string placement_to_string(Placement placement);
