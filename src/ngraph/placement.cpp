@@ -56,6 +56,7 @@ static Node* take_independent_node_with_placement_priority(
             {
                 selected_node = it.second.front();
                 it.second.pop_front();
+                break;
             }
         }
     }
