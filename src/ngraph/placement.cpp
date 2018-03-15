@@ -135,7 +135,9 @@ static vector<unordered_set<shared_ptr<Node>>>
     }
     if (cluster_nodes != f_nodes)
     {
-        throw ngraph_error("Cluster's nodes are not consistent with the original function's node");
+        throw ngraph_error("Cluster's nodes are not consistent with the original function's node. cluster_nodes.size()="
+                           + to_string(cluster_nodes.size())
+                           + ", f_nodes.size()=" + to_string(f_nodes.size()));
     }
 
     return clusters;
