@@ -117,9 +117,9 @@ static vector<unordered_set<shared_ptr<Node>>>
 
     // Sanity check for node duplication and full node coverage
     unordered_set<shared_ptr<Node>> cluster_nodes;
-    for (auto cluster: clusters)
+    for (auto cluster : clusters)
     {
-        for (auto node: cluster)
+        for (auto node : cluster)
         {
             if (cluster_nodes.find(node) != cluster_nodes.end())
             {
@@ -135,9 +135,9 @@ static vector<unordered_set<shared_ptr<Node>>>
     }
     if (cluster_nodes != f_nodes)
     {
-        throw ngraph_error("Cluster's nodes are not consistent with the original function's node. cluster_nodes.size()="
-                           + to_string(cluster_nodes.size())
-                           + ", f_nodes.size()=" + to_string(f_nodes.size()));
+        throw ngraph_error(
+            "Cluster's nodes are not the same as function's nodes. cluster_nodes.size()="
+            to_string(cluster_nodes.size()) + ", f_nodes.size()=" + to_string(f_nodes.size()));
     }
 
     return clusters;
