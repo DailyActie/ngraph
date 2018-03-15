@@ -71,7 +71,7 @@ static vector<unordered_set<shared_ptr<Node>>>
     unordered_map<Node*, size_t> node_dependency_count;
     unordered_map<ngraph::Node*, shared_ptr<ngraph::Node>> node_map;
 
-    for (shared_ptr<Node> node : f->get_ordered_ops())
+    for (shared_ptr<Node> node : f->get_ops())
     {
         size_t dependency_count = node->get_input_ops().size();
         node_map[node.get()] = node;
