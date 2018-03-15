@@ -115,6 +115,29 @@ static vector<unordered_set<shared_ptr<Node>>>
         previous_placement = node_placement;
     }
 
+    // Sanity check for node duplication and full node coverage
+    unordered_set<shared_ptr<Node>> cluster_nodes;
+    for (auto cluster: clusters)
+    {
+        for (auto node: cluster)
+        {
+            if (cluster_nodes.find(node) != cluster_nodes.end())
+            {
+                throw ngraph_error("Node " + node->get_name() + " is duplicated in clusters");
+            }
+            cluster_nodes.insert(node);
+        }
+    }
+    unordered_set<shared_ptr<Node>> f_nodes;
+    for (auto node : f->get_ordered_ops())
+    {
+        f_nodes.insert(node);
+    }
+    if (cluster_nodes != f_nodes)
+    {
+        throw ngraph_error("Cluster's nodes are not consistent with the original function's node");
+    }
+
     return clusters;
 }
 
