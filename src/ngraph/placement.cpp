@@ -100,6 +100,13 @@ static vector<unordered_set<shared_ptr<Node>>>
         }
     }
 
+    if (sorted_nodes.size() != f->get_ops().size())
+    {
+        throw ngraph_error(
+            "sorted_nodes.size()== " + to_string(sorted_nodes.size()) + " != f->get_ops().size()== "
+            + to_string(f->get_ops().size()) + ". Internal error with topological sort.");
+    }
+
     // Build clusters from the sorted_nodes
     previous_placement = Placement::DEFAULT;
     vector<unordered_set<shared_ptr<Node>>> clusters;
@@ -136,7 +143,7 @@ static vector<unordered_set<shared_ptr<Node>>>
     if (cluster_nodes != f_nodes)
     {
         throw ngraph_error(
-            "Cluster's nodes are not the same as function's nodes. cluster_nodes.size()="
+            "Cluster's nodes are not the same as function's nodes. cluster_nodes.size()=" +
             to_string(cluster_nodes.size()) + ", f_nodes.size()=" + to_string(f_nodes.size()));
     }
 
